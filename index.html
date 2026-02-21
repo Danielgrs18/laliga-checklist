@@ -1,0 +1,949 @@
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mis Cromos LaLiga 2025/26</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 10px;
+    background: #f4f4f4;
+}
+
+h1 { text-align: center; }
+
+.section {
+    margin-top: 20px;
+}
+
+.section h2 {
+    background: #1e293b;
+    color: white;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 16px;
+    margin-bottom: 0;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.section h2:hover {
+    background: #0f172a;
+}
+
+.section-content {
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.section-content.collapsed {
+    max-height: 0;
+}
+
+.section-content.expanded {
+    max-height: 5000px; /* suficiente para cualquier equipo */
+}
+
+.sticker {
+    background: white;
+    margin: 5px 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.sticker-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding-right: 10px;
+}
+
+.sticker-nc {
+    font-weight: 900;
+    color: #e63946;
+    font-size: 15px;
+}
+
+.sticker-name {
+    font-size: 14px;
+    color: #334155;
+    margin-top: 2px;
+}
+
+.controls {
+    position: sticky;
+    top: 0;
+    background: #f4f4f4;
+    padding-bottom: 10px;
+    z-index: 10;
+    display: flex;
+    gap: 5px;
+}
+
+button {
+    padding: 10px;
+    flex: 1;
+    border: none;
+    border-radius: 4px;
+    background-color: #3b82f6;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #2563eb;
+}
+
+.progress {
+    margin: 10px 0;
+    font-weight: bold;
+    text-align: center;
+    background: #e2e8f0;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+input[type="checkbox"] {
+    transform: scale(1.5);
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<h1>😎 Mis Cromos LaLiga 25/26 🤘</h1>
+
+<div class="controls">
+    <button onclick="showMissing()">Ver faltantes</button>
+    <button onclick="showAll()">Ver todos</button>
+    <button onclick="exportToExcel()">Exportar faltantes</button>
+</div>
+
+<div class="progress" id="progress"></div>
+<div id="container"></div>
+
+<script>
+// Base de datos de cromos mapeada desde el PDF [ID Global : ["N.C.", "Nombre"]]
+// (He incluido la mayoría de los equipos parseados del documento, estructurados para que pesen poco)
+const stickerDB = {
+    // ALAVÉS
+    1:["1","Escudo Deportivo Alavés"], 2:["2","Entrenador - Eduardo Coudet"], 3:["3","Sivera"], 4:["4","Owono"], 5:["5","Tenaglia"], 6:["6","Hugo Novoa"], 7:["7","Garcés"], 8:["8","Mouriño"], 9:["9","Moussa Diarra"], 10:["10","Manu Sánchez"], 11:["11","Guevara"], 12:["12","Benavidez"], 13:["13","Guridi"], 14:["14","Blanco"], 15:["15","Aleñá"], 16:["16","Calebe"], 17:["17","Carlos Vicente"], 18:["18","Toni Martínez"], 19:["19","Conechny"], 20:["20","Villalibre"], 21:["9BIS","Raúl Fernández"], 22:["10BIS","Jonny"], 23:["BIS","Yusi"], 24:["8BIS","Parada"], 25:["20BIS","Mariano"], 26:["19BIS","Boyé"],
+    // ATHLETIC
+    41:["1","Escudo Athletic Club"], 42:["2","Entrenador - Ernesto Valverde"], 43:["3","Unai Simon"], 44:["4","Padilla"], 45:["5A","Gorosabel"], 46:["5B","Lekue"], 47:["6","Vivian"], 48:["7","Paredes"], 49:["8","Yeray"], 50:["9A","Yuri"], 51:["9B","Adama Boiro"], 52:["10","Vesga"], 53:["11","Jauregizar"], 54:["12","Prados"], 55:["13","Ruiz de Galarreta"], 56:["14","Unai Gómez"], 57:["15","Sancet"], 58:["16","Nico Williams"], 59:["17A","Djaló"], 60:["17B","Marcan"], 61:["18","Williams"], 62:["19","Guruzeta"], 63:["20","Berenguer"],
+    // ATLÉTICO
+    71:["1","Escudo Atlético de Madrid"], 72:["2","Entrenador - Diego Pablo Simeone"], 73:["3","Oblak"], 74:["4","Musso"], 75:["5","Nahuel Molina"], 76:["6","Giménez"], 77:["7","Le Normand"], 78:["8","Lenglet"], 79:["9","Galán"], 80:["10","Gallagher"], 81:["11","Marcos Llorente"], 82:["12","De Paul"], 83:["13","Barrios"], 84:["14","Koke"], 85:["15","Samuel Lino"], 86:["16","Johnny Cardoso"], 87:["17","Giuliano"], 88:["18","Griezmann"], 89:["19","Julián Alvarez"], 90:["20","Sorloth"], 91:["5BIS","Pubill"], 92:["9BIS","Ruggeri"], 93:["15BIS","Almada"], 94:["12BIS","Nico González"],
+    // BARÇA
+    101:["1","Escudo FC Barcelona"], 102:["2","Entrenador - Hansi Flick"], 103:["3","Ter Stegen"], 104:["4","Szczesny"], 105:["5","Koundé"], 106:["6","Cubarsi"], 107:["7","Iñigo Martínez"], 108:["8A","Araújo"], 109:["8B","Christensen"], 110:["9A","Eric García"], 111:["9B","Héctor Fort"], 112:["10A","Balde"], 113:["10B","Gerard Martin"], 114:["11A","Casadó"], 115:["11B","Marc Bernal"], 116:["12","De Jong"], 117:["13","Fermín"], 118:["14","Gavi"], 119:["15","Pedri"], 120:["16","Dani Olmo"], 121:["17","Ferran Torres"], 122:["18","Raphinha"], 123:["19","Lamine Yamal"], 124:["20","Lewandowski"], 125:["7BIS","Jofre Torrents"], 126:["13BIS","Orio"],
+    /* =========================
+   REAL BETIS (131–154)
+========================= */
+131:["1","Escudo Real Betis"],
+132:["2","Entrenador Real Betis - Manuel Pellegrini"],
+133:["3","Pau López"],
+134:["4","Adrián"],
+135:["5A","Aitor Ruibal"],
+136:["5B","Ortiz"],
+137:["6","Bartra"],
+138:["7","Natan"],
+139:["8","Diego Llorente"],
+140:["9","Perraud"],
+141:["10A","Ricardo Rodríguez"],
+142:["10B","Junior"],
+143:["11","Marc Roca"],
+144:["12","Altimira"],
+145:["13","Lo Celso"],
+146:["14","Pablo Fornals"],
+147:["15","Isco"],
+148:["16","Pablo García"],
+149:["17","Antony"],
+150:["18","Abde"],
+151:["19","Bakambu"],
+152:["20","Cucho Hernández"],
+153:["9BIS","Bellerín"],
+154:["19BIS","Chimy Ávila"],
+
+/* =========================
+   RC CELTA (161–183)
+========================= */
+161:["1","Escudo RC Celta"],
+162:["2","Entrenador RC Celta - Claudio Giráldez"],
+163:["3","Radu"],
+164:["4","Iván Villar"],
+165:["5","Javi Rodríguez"],
+166:["6","Carreira"],
+167:["7A","Domínguez"],
+168:["7B","Yoel Lago"],
+169:["8","Starfelt"],
+170:["9","Mingueza"],
+171:["10A","Marcos Alonso"],
+172:["10B","Ristic"],
+173:["11","Fran Beltrán"],
+174:["12","Ilaix Moriba"],
+175:["13","Damián"],
+176:["14","Hugo Álvarez"],
+177:["15","Sotelo"],
+178:["16","Cervi"],
+179:["17","Pablo Durán"],
+180:["18","Swedberg"],
+181:["19","Borja Iglesias"],
+182:["20","Iago Aspas"],
+183:["6BIS","Javi Rueda"],
+
+/* =========================
+   ELCHE CF (191–219)
+========================= */
+191:["1","Escudo Elche CF"],
+192:["2","Entrenador Elche CF - Eder Sarabia"],
+193:["3","Dituro"],
+194:["4","Iturbe"],
+195:["5","Álvaro Núñez"],
+196:["6","Diaby"],
+197:["7","Affengruber"],
+198:["8","John Chetauya"],
+199:["9","Bigas"],
+200:["10","Jairo"],
+201:["11","Febas"],
+202:["12","Marc Aguado"],
+203:["13","Martim Neto"],
+204:["14","Nico Fernández"],
+205:["15A","Josan"],
+206:["15B","Rodri Mendoza"],
+207:["16","Yago Santiago"],
+208:["17","Agustín Álvarez"],
+209:["18","Germán Valera"],
+210:["19","Óscar Plano"],
+211:["20","Mourad"],
+212:["10BIS","Pétrot"],
+213:["14BIS","Fede Redondo"],
+214:["16BIS","Ali Houary"],
+215:["17BIS","Rafa Mir"],
+216:["19BIS","Álvaro Rodríguez"],
+217:["4BIS","Iñaki Peña"],
+218:["6BIS","Héctor Fort"],
+219:["20BIS","Diangana"],
+
+/* =========================
+   RCD ESPANYOL (221–243)
+========================= */
+221:["1","Escudo RCD Espanyol"],
+222:["2","Entrenador RCD Espanyol - Manolo González"],
+223:["3","Dmitrovic"],
+224:["4","Fortuño"],
+225:["5","El Hilali"],
+226:["6","Cabrera"],
+227:["7","Calero"],
+228:["8","Pablo Ramón"],
+229:["9","Carlos Romero"],
+230:["10","Salinas"],
+231:["11","Rubén Sánchez"],
+232:["12","Gragera"],
+233:["13","Terrats"],
+234:["14","Edu Expósito"],
+235:["15","Pol Lozano"],
+236:["16","Antoniu Roca"],
+237:["17","Jofre"],
+238:["18","Roberto Fernández"],
+239:["19","Puado"],
+240:["20","Pere Milla"],
+241:["8BIS","Riedel"],
+242:["12BIS","Urko"],
+243:["17BIS","Koleosho"],
+
+/* =========================
+   GETAFE CF (251–276)
+========================= */
+251:["1","Escudo Getafe CF"],
+252:["2","Entrenador Getafe CF - José Bordalás"],
+253:["3","David Soria"],
+254:["4","Letacek"],
+255:["5","Iglesias"],
+256:["6A","Sola"],
+257:["6B","Davinchi"],
+258:["7","Alderete"],
+259:["8","Djene"],
+260:["9A","Domingos Duarte"],
+261:["9B","Berrocal"],
+262:["10","Diego Rico"],
+263:["11","Arambarri"],
+264:["12","Mario Martín"],
+265:["13","Uche"],
+266:["14","Milla"],
+267:["15","Javi Muñoz"],
+268:["16","Coba"],
+269:["17","Peter Federico"],
+270:["18","Juanmi"],
+271:["19","Borja Mayoral"],
+272:["20","Álvaro Rodríguez"],
+273:["20BIS","Álex Sancris"],
+274:["7BIS","Abqar"],
+275:["13BIS","Neyou"],
+276:["17BIS","Abu Kamara"],
+
+/* =========================
+   GIRONA FC (281–308)
+========================= */
+281:["1","Escudo Girona FC"],
+282:["2","Entrenador Girona FC - Míchel"],
+283:["3","Gazzaniga"],
+284:["4A","Krapivtsov"],
+285:["4B","Juan Carlos"],
+286:["5","Arnau"],
+287:["6","Francés"],
+288:["7","David López"],
+289:["8","Krejci"],
+290:["9","Blind"],
+291:["10","Miguel Gutiérrez"],
+292:["11","Solis"],
+293:["12","Van de Beek"],
+294:["13","Arthur"],
+295:["14","Yangel Herrera"],
+296:["15","Ivan Martín"],
+297:["16","Tsygankov"],
+298:["17","Yáser Asprilla"],
+299:["18A","Portu"],
+300:["18B","Misehouy"],
+301:["19","Stuani"],
+302:["20A","Abel Ruiz"],
+303:["20B","Miovski"],
+304:["13BIS","Joel Roca"],
+305:["8BIS","Witsel"],
+306:["10BIS","Álex Moreno"],
+307:["14BIS","Ounahi"],
+308:["17BIS","Bryan Gil"],
+
+/* =========================
+   LEVANTE UD (311–336)
+========================= */
+311:["1","Escudo Levante UD"],
+312:["2","Entrenador Levante UD - Julián Calero"],
+313:["3","Pablo Campos"],
+314:["4","Alfonso Pastor"],
+315:["5","Xavi Grande"],
+316:["6","Dela"],
+317:["7","Cabello"],
+318:["8","Matturro"],
+319:["9","Elgezabal"],
+320:["10","Pampín"],
+321:["11","Iborra"],
+322:["12","Oriol Rey"],
+323:["13","Sergio Lozano"],
+324:["14","Olasagasti"],
+325:["15","Pablo Martínez"],
+326:["16","Carlos Álvarez"],
+327:["17","Iván Romero"],
+328:["18","Morales"],
+329:["19A","Carlos Espí"],
+330:["19B","Víctor Fernández"],
+331:["20","Brugué"],
+332:["05BIS","Víctor García"],
+333:["11BIS","Manu Sánchez"],
+334:["13BIS","Iker Losada"],
+335:["4BIS","Ryan"],
+336:["12BIS","Arriaga"],
+// MADRID
+341:["1","Escudo Real Madrid"], 342:["2","Entrenador - Xabi Alonso"], 343:["3","Courtois"], 344:["4","Lunin"], 345:["5","Carvajal"], 346:["6","Asencio"], 347:["7","Rüdiger"], 348:["8","Militao"], 349:["9","Alaba"], 350:["10A","Mendy"], 351:["10B","Fran García"], 352:["11","Tchouameni"], 353:["12","Camavinga"], 354:["13","Dani Ceballos"], 355:["14","Fede Valverde"], 356:["15","Bellingham"], 357:["16","Güler"], 358:["17A","Brahim Díaz"], 359:["17B","Endrick"], 360:["18","Rodrygo"], 361:["19","Mbappé"], 362:["20","Vinicius"], 363:["18BIS","Gonzalo"],
+
+/* =========================
+   RCD MALLORCA (371–395)
+========================= */
+371:["1","Escudo RCD Mallorca"],
+372:["2","Entrenador RCD Mallorca - Jagoba Arrasate"],
+373:["3","Greif"],
+374:["4","Bergström"],
+375:["5A","Maffeo"],
+376:["5B","Morey"],
+377:["6","Raillo"],
+378:["7","Copete"],
+379:["8","Valjent"],
+380:["9","Mojica"],
+381:["10","Lato"],
+382:["11","Mascarell"],
+383:["12","Samu Costa"],
+384:["13","Darder"],
+385:["14","Antonio Sánchez"],
+386:["15","Dani Rodríguez"],
+387:["16","Morlanes"],
+388:["17","Marc Domènech"],
+389:["18","Asano"],
+390:["19","Muriqi"],
+391:["20A","Abdón"],
+392:["20B","Larin"],
+393:["03BIS","Leo Román"],
+394:["7BIS","Kumbulla"],
+395:["17BIS","Javi Llabrés"],
+
+/* =========================
+   C.A. OSASUNA (401–420)
+========================= */
+401:["1","Escudo CA Osasuna"],
+402:["2","Entrenador CA Osasuna - Alessio Lisci"],
+403:["3","Sergio Herrera"],
+404:["4","Aitor Fernández"],
+405:["5","Rosier"],
+406:["6","Catena"],
+407:["7","Boyomo"],
+408:["8","Herrando"],
+409:["9","Juan Cruz"],
+410:["10","Abel Bretones"],
+411:["11","Moncayola"],
+412:["12","Torró"],
+413:["13","Iker Muñoz"],
+414:["14","Rubén García"],
+415:["15","Moi Gómez"],
+416:["16","Aimar Oroz"],
+417:["17","Víctor Muñoz"],
+418:["18","Kike Barja"],
+419:["19","Budimir"],
+420:["20","Raúl García"],
+
+/* =========================
+   REAL OVIEDO (431–456)
+========================= */
+431:["1","Escudo Real Oviedo"],
+432:["2","Entrenador Real Oviedo - Veljko Paunovic"],
+433:["3","Aarón Escandell"],
+434:["4","Moldovan"],
+435:["5","Nacho Vidal"],
+436:["6","Dani Calvo"],
+437:["7","Luengo"],
+438:["8","David Costas"],
+439:["9","Rahim Alhassane"],
+440:["10","Ejaria"],
+441:["11","Colombatto"],
+442:["12","Reina"],
+443:["13","Sibo"],
+444:["14","Santi Cazorla"],
+445:["15","Ilic"],
+446:["16A","Álex Cardero"],
+447:["16B","Lucas Ahijado"],
+448:["17","Hassan"],
+449:["18A","Ilyas Chaira"],
+450:["18B","Fede Viñas"],
+451:["19","Paraschiv"],
+452:["20","Paulino"],
+453:["19BIS","Brekalo"],
+454:["20BIS","Álex Forés"],
+455:["7BIS","Bailly"],
+456:["15","Ilic (Escudo Variante)"],
+
+/* =========================
+   RAYO VALLECANO (461–484)
+========================= */
+461:["1","Escudo Rayo Vallecano"],
+462:["2","Entrenador Rayo Vallecano - Íñigo Pérez"],
+463:["3","Batalla"],
+464:["4","Cárdenas"],
+465:["5","Balliu"],
+466:["6","Ratiu"],
+467:["7","Lejeune"],
+468:["8","Mumin"],
+469:["9","Espino"],
+470:["10","Pep Chavarria"],
+471:["11","Pathé Ciss"],
+472:["12","Óscar Valentín"],
+473:["13","Pedro Díaz"],
+474:["14","Isi"],
+475:["15A","Nteka"],
+476:["15B","Trejo"],
+477:["16","Unai López"],
+478:["17","Camello"],
+479:["18","De Frutos"],
+480:["19","Álvaro García"],
+481:["20","Etienne Eto'o"],
+482:["13BIS","Gumbau"],
+483:["8BIS","Vertrouwd"],
+484:["20BIS","Fran Pérez"],
+
+/* =========================
+   REAL SOCIEDAD (491–516)
+========================= */
+491:["1","Escudo Real Sociedad"],
+492:["2","Entrenador Real Sociedad - Sergio Francisco"],
+493:["3","Remiro"],
+494:["4","Marrero"],
+495:["5A","Aramburu"],
+496:["5B","Traoré"],
+497:["6","Martín"],
+498:["7","Zubeldia"],
+499:["8","Pacheco"],
+500:["9","Aritz Elustondo"],
+501:["10A","Javi López"],
+502:["10B","Aihen Muñoz"],
+503:["11","Turrientes"],
+504:["12","Pablo Marín"],
+505:["13","Sergio Gómez"],
+506:["14A","Brais Méndez"],
+507:["14B","Olasagasti"],
+508:["15","Sucic"],
+509:["16","Kubo"],
+510:["17","Barrenetxea"],
+511:["18","Oyarzabal"],
+512:["19","Mariezkurrena"],
+513:["20","Óskarsson"],
+514:["15BIS","Zakharyan"],
+515:["8BIS","Odriozola"],
+516:["19BIS","Karrikaburu"],
+
+/* =========================
+   SEVILLA FC (521–546)
+========================= */
+521:["1","Escudo Sevilla FC"],
+522:["2","Entrenador Sevilla FC - Matías Almeyda"],
+523:["3","Nyland"],
+524:["4","Álvaro Fernández"],
+525:["5","Carmona"],
+526:["6","Juanlu"],
+527:["7A","Kike Salas"],
+528:["7B","Marcao"],
+529:["8","Badé"],
+530:["9","Nianzou"],
+531:["10","Pedrosa"],
+532:["11","Gudelj"],
+533:["12","Sow"],
+534:["13","Agoumé"],
+535:["14","Vargas"],
+536:["15","Manu Bueno"],
+537:["16","Peque"],
+538:["17","Ejuke"],
+539:["18","Lukebakio"],
+540:["19","Isaac Romero"],
+541:["20A","Akor Adams"],
+542:["20B","Idumbo"],
+543:["4BIS","Vlachodimos"],
+544:["8BIS","Castrín"],
+545:["10BIS","Azpilicueta"],
+546:["18BIS","Alexis Sánchez"],
+
+/* =========================
+   VALENCIA CF (551–576)
+========================= */
+551:["1","Escudo Valencia CF"],
+552:["2","Entrenador Valencia CF - Carlos Corberán"],
+553:["3","Dimitrievski"],
+554:["4","Agirrezabala"],
+555:["5A","Correia"],
+556:["5B","Foulquier"],
+557:["6","Mosquera"],
+558:["7","Diakhaby"],
+559:["8","Tárrega"],
+560:["9A","Yarek"],
+561:["9B","Jesús Vázquez"],
+562:["10","Gayà"],
+563:["11","Santamaria"],
+564:["12","Guillamón"],
+565:["13","Pepelu"],
+566:["14","André Almeida"],
+567:["15","Javi Guerra"],
+568:["16","Luis Rioja"],
+569:["17","Canós"],
+570:["18","Fran Pérez"],
+571:["19","Hugo Duro"],
+572:["20","Diego López"],
+573:["6BIS","Copete"],
+574:["18BIS","Danjuma"],
+575:["12BIS","Cömert"],
+576:["17BIS","Lucas Beltrán"],
+
+/* =========================
+   VILLARREAL CF (581–604)
+========================= */
+581:["1","Escudo Villarreal CF"],
+582:["2","Entrenador Villarreal CF - Marcelino García"],
+583:["3","Luiz Júnior"],
+584:["4","Diego Conde"],
+585:["5","Pau Navarro"],
+586:["6","Foyth"],
+587:["7","Logan Costa"],
+588:["8","Kambwala"],
+589:["9","Sergi Cardona"],
+590:["10","Pedraza"],
+591:["11","Santi Comesaña"],
+592:["12","Pape Gueye"],
+593:["13","Parejo"],
+594:["14","Denis Suárez"],
+595:["15","Yeremy Pino"],
+596:["16","Ilias"],
+597:["17","Pépé"],
+598:["18","Gerard Moreno"],
+599:["19","Ayoze"],
+600:["20","Barry"],
+601:["20BIS","Buchanan"],
+602:["14BIS","Thomas"],
+603:["4BIS","Arnau Tenas"],
+604:["15BIS","Oluwasayi"],
+
+/* =========================
+    SECCIONES ESPECIALES
+    611–773
+========================= */
+
+// SUPER KIDS (ADN LALIGA / SUPER KIDS)
+611:["1","Asencio (Super Kids)"],
+612:["1KR","Asencio (Super Kids KR)"],
+
+613:["2","Balde (Super Kids)"],
+614:["2KR","Balde (Super Kids KR)"],
+
+615:["3","Barrios (Super Kids)"],
+616:["3KR","Barrios (Super Kids KR)"],
+
+617:["4","Barry (Super Kids)"],
+618:["4KR","Barry (Super Kids KR)"],
+
+619:["5","Casadó (Super Kids)"],
+620:["5KR","Casadó (Super Kids KR)"],
+
+621:["6","Cubarsí (Super Kids)"],
+622:["6KR","Cubarsí (Super Kids KR)"],
+
+623:["7","Diego López (Super Kids)"],
+624:["7KR","Diego López (Super Kids KR)"],
+
+625:["8","Fer López (Super Kids)"],
+626:["8KR","Fer López (Super Kids KR)"],
+
+627:["9","Giuliano (Super Kids)"],
+628:["9KR","Giuliano (Super Kids KR)"],
+
+629:["10","Güler (Super Kids)"],
+630:["10KR","Güler (Super Kids KR)"],
+
+631:["11","Jauregizar (Super Kids)"],
+632:["11KR","Jauregizar (Super Kids KR)"],
+
+633:["12","Javi Guerra (Super Kids)"],
+634:["12KR","Javi Guerra (Super Kids KR)"],
+
+635:["13","Jesús Rodríguez (Super Kids)"],
+636:["13KR","Jesús Rodríguez (Super Kids KR)"],
+
+637:["14","Lamine Yamal (Super Kids)"],
+638:["14KR","Lamine Yamal (Super Kids KR)"],
+
+639:["15","Pablo Marín (Super Kids)"],
+640:["15KR","Pablo Marín (Super Kids KR)"],
+
+    // MISTER CERO (631–647)
+631:["1","Batalla (Mister Cero)"],
+632:["2","Courtois (Mister Cero)"],
+633:["3","David Soria (Mister Cero)"],
+634:["4","Dimitrievski (Mister Cero)"],
+635:["5","Gazzaniga (Mister Cero)"],
+636:["6","Luiz Júnior (Mister Cero)"],
+637:["7","Lunin (Mister Cero)"],
+638:["8","Nyland (Mister Cero)"],
+639:["9","Oblak (Mister Cero)"],
+640:["10","Remiro (Mister Cero)"],
+641:["11","Sergio Herrera (Mister Cero)"],
+642:["12","Sivera (Mister Cero)"],
+643:["13","Unai Simón (Mister Cero)"],
+644:["14","Casillas (Icono Mister Cero)"],
+645:["15","Reina (Icono Mister Cero)"],
+646:["16","Víctor Valdés (Icono Mister Cero)"],
+647:["14BIS","Agirrezabala (Mister Cero)"],
+
+// EXTRA GOLD (761–773)
+761:["1","Ayoze (Extra Gold)"],
+762:["2","Bellingham (Extra Gold)"],
+763:["3","Budimir (Extra Gold)"],
+764:["4","Isco (Extra Gold)"],
+765:["5","Lewandowski (Extra Gold)"],
+766:["6","Nico Williams (Extra Gold)"],
+767:["7","Pedri (Extra Gold)"],
+768:["8","Sancet (Extra Gold)"],
+769:["9","Raphinha (Extra Gold)"],
+770:["10","Vinícius (Extra Gold)"],
+771:["11","Julián Álvarez (Supreme Extra Gold)"],
+772:["12","Lamine Yamal (Supreme Extra Gold)"],
+773:["13","Mbappé (Supreme Extra Gold)"],
+
+    // ÚLTIMOS FICHAJES 
+
+681:["1","Huijsen (Últimos Fichajes)"],
+682:["2","Jutglà (Últimos Fichajes)"],
+683:["3","Pablo Ibáñez (Últimos Fichajes)"],
+684:["4","Robert Navarro (Últimos Fichajes)"],
+685:["5","Rafa Marín (Últimos Fichajes)"],
+686:["6","Toljan (Últimos Fichajes)"],
+687:["7","Miguel Rubio (Últimos Fichajes)"],
+688:["8","Joan García (Últimos Fichajes)"],
+689:["9","Trent (Últimos Fichajes)"],
+690:["10","Riquelme (Últimos Fichajes)"],
+691:["11","Raba (Últimos Fichajes)"],
+692:["12","Pablo Torre (Últimos Fichajes)"],
+693:["13","Hugo Rincón (Últimos Fichajes)"],
+694:["14","Kike García (Últimos Fichajes)"],
+695:["15","Moleiro (Últimos Fichajes)"],
+696:["16","Alfon (Últimos Fichajes)"],
+697:["17","Valentín Gómez (Últimos Fichajes)"],
+698:["18","Carreras (Últimos Fichajes)"],
+699:["19","Gorrotxategi (Últimos Fichajes)"],
+700:["20","Rashford (Últimos Fichajes)"],
+701:["21","Valles (Últimos Fichajes)"],
+702:["22","Brandon Domingues (Últimos Fichajes)"],
+703:["23","Kiko Femenía (Últimos Fichajes)"],
+704:["24","Álex Baena (Últimos Fichajes)"],
+705:["25","Chust (Últimos Fichajes)"],
+706:["26","Suazo (Últimos Fichajes)"],
+707:["27","Dolan (Últimos Fichajes)"],
+708:["28","Vitor Reis (Últimos Fichajes)"],
+709:["29","Caleta-Car (Últimos Fichajes)"],
+710:["30","Mouriño (Últimos Fichajes)"],
+711:["31","Bryan Zaragoza (Últimos Fichajes)"],
+712:["32","Areso (Últimos Fichajes)"],
+713:["33","Mateo Joseph (Últimos Fichajes)"],
+714:["34","Liso (Últimos Fichajes)"],
+715:["35","Hancko (Últimos Fichajes)"],
+716:["36","Guedes (Últimos Fichajes)"],
+717:["37","Ugrinic (Últimos Fichajes)"],
+718:["38","Rondón (Últimos Fichajes)"],
+719:["39","Deossa (Últimos Fichajes)"],
+720:["40","Lemar (Últimos Fichajes)"],
+721:["41","Bardghji (Últimos Fichajes)"],
+722:["42","Raspadori (Últimos Fichajes)"],
+723:["43","Koyalipou (Últimos Fichajes)"],
+724:["44","André Silva (Últimos Fichajes)"],
+725:["45","Renato Veiga (Últimos Fichajes)"],
+726:["46","Mastantuono (Últimos Fichajes)"],
+727:["47","Luiz Felipe (Últimos Fichajes)"],
+728:["48","Becker (Últimos Fichajes)"],
+729:["49","Jan Virgili (Últimos Fichajes)"],
+730:["50","Pickel (Últimos Fichajes)"],
+731:["51","Denis Suárez (Últimos Fichajes)"],
+732:["52","Solomon (Últimos Fichajes)"],
+733:["53","Dendoncker (Últimos Fichajes)"],
+734:["54","Pedrosa (Últimos Fichajes)"],
+735:["55","Amrabat (Últimos Fichajes)"],
+736:["56","Alemão (Últimos Fichajes)"],
+737:["57","Carlos Soler (Últimos Fichajes)"],
+738:["58","Etta Eyong (Últimos Fichajes)"],
+739:["59","Livakovic (Últimos Fichajes)"],
+740:["60","Fábio Cardoso (Últimos Fichajes)"],
+741:["61","David Carmo (Últimos Fichajes)"],
+742:["62","Batista Mendy (Últimos Fichajes)"],
+743:["63","Ramazani (Últimos Fichajes)"],
+744:["64","Vanat (Últimos Fichajes)"],
+745:["65","Mikautadze (Últimos Fichajes)"],
+746:["66","Laporte (Últimos Fichajes)"],
+
+// TOP FICHAJES
+
+747:["67","Álex Baena (Top Fichajes)"],
+748:["68","Rashford (Top Fichajes)"],
+749:["69","Mastantuono (Top Fichajes)"]
+};
+
+
+const sections = [
+    {name:"Deportivo Alavés", start:1, end:26},
+    {name:"Athletic Club", start:41, end:63},
+    {name:"Atlético de Madrid", start:71, end:94},
+    {name:"FC Barcelona", start:101, end:126},
+    {name:"Real Betis", start:131, end:154},
+    {name:"RC Celta", start:161, end:183},
+    {name:"Elche CF", start:191, end:219},
+    {name:"RCD Espanyol", start:221, end:243},
+    {name:"Getafe CF", start:251, end:276},
+    {name:"Girona FC", start:281, end:308},
+    {name:"Levante UD", start:311, end:336},
+    {name:"Real Madrid", start:341, end:363},
+    {name:"RCD Mallorca", start:371, end:395},
+    {name:"C.A. Osasuna", start:401, end:420},
+    {name:"Real Oviedo", start:431, end:456},
+    {name:"Rayo Vallecano", start:461, end:484},
+    {name:"Real Sociedad", start:491, end:516},
+    {name:"Sevilla FC", start:521, end:546},
+    {name:"Valencia CF", start:551, end:576},
+    {name:"Villarreal CF", start:581, end:604},
+    {name:"ADN LaLiga / Super Kids", start:611, end:625},
+    {name:"Mister Cero", start:631, end:647},
+    {name:"MIX", start:651, end:677},
+    {name:"Últimos Fichajes / Top", start:681, end:749},
+    {name:"Extra Gold / Supreme", start:761, end:773}
+];
+
+let collection = JSON.parse(localStorage.getItem("collection_laliga_25_26_v3")) || {};
+let showOnlyMissing = false;
+
+function render() {
+    const container = document.getElementById("container");
+    container.innerHTML = "";
+
+    let ownedCount = 0;
+    let totalCount = 0;
+
+    sections.forEach(section => {
+        const divSection = document.createElement("div");
+        divSection.className = "section";
+
+        const title = document.createElement("h2");
+        title.innerHTML = `
+            <span>${section.name}</span>
+            <span id="arrow-${section.start}">▼</span>
+        `;
+        title.onclick = () => toggleSection(section.start);
+        divSection.appendChild(title);
+
+        const content = document.createElement("div");
+        content.className = "section-content expanded";
+        content.id = `section-${section.start}`;
+
+        let localIndex = 1;
+
+        for (let i = section.start; i <= section.end; i++) {
+            totalCount++;
+            const owned = collection[i] === true;
+            if (owned) ownedCount++;
+
+            if (showOnlyMissing && owned) continue;
+
+            // Buscamos el cromo en la base de datos; si no está, usamos el índice por defecto
+            const sData = stickerDB[i] || [localIndex, "Cromo " + i]; 
+            const ncText = sData[0];
+            const nameText = sData[1];
+
+            const div = document.createElement("div");
+            div.className = "sticker";
+
+            div.innerHTML = `
+                <div class="sticker-info">
+                    <span class="sticker-nc"> ${ncText}</span>
+                    <span class="sticker-name">${nameText}</span>
+                </div>
+                <input type="checkbox" ${owned ? "checked" : ""}
+                    onchange="toggle(${i})">
+            `;
+
+            content.appendChild(div);
+            localIndex++;
+        }
+        divSection.appendChild(content);
+        container.appendChild(divSection);
+    });
+
+    const percent = totalCount === 0 ? 0 : ((ownedCount / totalCount) * 100).toFixed(1);
+    document.getElementById("progress").innerText =
+        `Tienes ${ownedCount} / ${totalCount} cromos (${percent}%)`;
+}
+
+function toggle(id) {
+    collection[id] = !collection[id];
+    localStorage.setItem("collection_laliga_25_26_v3", JSON.stringify(collection));
+    render();
+}
+
+function showMissing() {
+    showOnlyMissing = true;
+    render();
+}
+
+function showAll() {
+    showOnlyMissing = false;
+    render();
+}
+
+function exportMissing() {
+    let csv = "ID_GLOBAL,N.C.,Nombre,Equipo\n";
+    sections.forEach(section => {
+        for (let i = section.start; i <= section.end; i++) {
+            if (!collection[i]) {
+                const sData = stickerDB[i] || [i, "Desconocido"];
+                csv += `${i},${sData[0]},"${sData[1]}","${section.name}"\n`;
+            }
+        }
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "faltantes_laliga_25_26_detallado.csv";
+    a.click();
+}
+
+
+function exportToExcel() {
+    const missing = [];
+
+    document.querySelectorAll("input[type='checkbox']").forEach(cb => {
+        if (!cb.checked) {
+            const id = cb.dataset.id;
+            const value = stickerDB[id];
+
+            if (value) {
+                missing.push({
+                    ID_Global: id,
+                    Numero_Cromo: value[0],
+                    Nombre: value[1]
+                });
+            }
+        }
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(missing);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Faltantes");
+
+    XLSX.writeFile(workbook, "Cromos_Faltantes.xlsx");
+}
+
+function toggleSection(id) {
+    const section = document.getElementById(`section-${id}`);
+    const arrow = document.getElementById(`arrow-${id}`);
+
+    if (section.classList.contains("collapsed")) {
+        section.classList.remove("collapsed");
+        section.classList.add("expanded");
+        arrow.innerText = "▼";
+    } else {
+        section.classList.remove("expanded");
+        section.classList.add("collapsed");
+        arrow.innerText = "▲";
+    }
+}
+
+
+
+// Guardar estado al cambiar un checkbox
+document.addEventListener("change", function(e) {
+    if (e.target.type === "checkbox") {
+        const id = e.target.dataset.id;
+        localStorage.setItem("sticker_" + id, e.target.checked);
+    }
+});
+
+// Restaurar estado al cargar
+window.addEventListener("DOMContentLoaded", function() {
+    document.querySelectorAll("input[type='checkbox']").forEach(cb => {
+        const id = cb.dataset.id;
+        const saved = localStorage.getItem("sticker_" + id);
+        if (saved === "true") {
+            cb.checked = true;
+        }
+    });
+});
+
+
+
+// Inicializar la app
+render();
+
+</script>
+</body>
+</html>
+
